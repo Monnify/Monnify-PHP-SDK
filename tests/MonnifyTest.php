@@ -25,9 +25,9 @@ class MonnifyTest extends TestCase
         $transactionData = [
             // Your transaction data here
             'amount' => 100.00,
-            'currency' => 'USD',
-            'customer_name' => 'John Doe',
-            'customer_email' => 'john.doe@example.com',
+            'currencyCode' => 'USD',
+            'customerName' => 'John Doe',
+            'customerEmail' => 'john.doe@example.com',
         ];
 
         // Call the method you want to test

@@ -19,7 +19,7 @@ $transferData = [
     'narration' => '911 Transaction',
     'destinationBankCode' => '057',
     'destinationAccountNumber' => '2085886393',
-    'currency' => 'NGN',
+    'currencyCode' => 'NGN',
     'sourceAccountNumber' => '3934178936',
 ];
 
