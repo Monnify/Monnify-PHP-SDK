@@ -1,9 +1,9 @@
 <?php
-
 namespace Monnify;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
+use Exception;
 
 class Monnify
 {
@@ -28,18 +28,19 @@ class Monnify
     private function getBearerToken()
     {
         try {
-            $response = $this->client->post($this->apiUrl . '/auth/login', [
+            $response = $this->client->post($this->apiUrl . '/api/v1/auth/login', [
                 'headers' => [
                     'Authorization' => 'Basic ' . base64_encode($this->apiKey . ':' . $this->apiSecret),
                 ],
             ]);
 
             $data = json_decode($response->getBody(), true);
-            return $data['token'];
+
+            return $data['responseBody']['accessToken'];
         } catch (RequestException $e) {
             // Handle the request exception when getting the Bearer token
             // You can log the error or throw an exception
-            throw new Exception("Failed to obtain the Bearer token: " . $e->getMessage());
+            throw new Exception("$this->apiUrl  Failed to obtain the Bearer token: " . $e->getMessage());
         }
     }
 
@@ -63,11 +64,28 @@ class Monnify
             }
 
             $response = $this->client->request($method, $url, $options);
+            // var_dump($response);
             return $this->handleResponse($response);
         } catch (RequestException $e) {
             // Handle the request exception
+               throw new Exception("$this->apiUrl  Failed to Make Request: " . $e->getMessage());
         }
+    }// undefined handleResponse
+    private function handleResponse($response)
+{
+    // Convert the response body to string and decode JSON
+    $body = (string) $response->getBody();
+
+    // Decode it into an associative array
+    $data = json_decode($body, true);
+
+    // Optional: check if decoding failed
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        throw new Exception('Invalid JSON response');
     }
+
+    return $data;
+}
 
     public function initializeTransaction($transactionData)
     {
@@ -230,4 +248,3 @@ class Monnify
         }
     }
 }
-
