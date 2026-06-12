@@ -1,211 +1,372 @@
 <?php
 
-use PHPUnit\Framework\TestCase;
+namespace Monnify\Tests;
+
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
+use Monnify\Auth\InMemoryTokenCache;
+use Monnify\Contracts\HttpClientInterface;
+use Monnify\Environment;
+use Monnify\Http\GuzzleHttpClient;
+use Monnify\Http\MonnifyApiClient;
 use Monnify\Monnify;
+use Monnify\MonnifyConfig;
+use Monnify\MonnifyException;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
 
 class MonnifyTest extends TestCase
 {
+    private array $history = [];
 
-    private $apiKey = 'MK_TEST_SAF7HR5F3F';
-    private $secretKey = '4SY6TNL8CK3VPRSBTHTRG2N8XXEGC6NL';
-    private $contractCode = '4934121686';
-
-
-    public function testInitializeTransaction()
+    #[Test]
+    public function constructorDoesNotAuthenticateImmediately(): void
     {
-        // Initialize a Monnify instance (you may need to provide a configuration)
-        $monnify = new Monnify([
-            'api_key' => $this->apiKey, 
-            'secret_key' => $this->secretKey,  
-            'contract_code' => $this->contractCode,  
-            'test' => true
+        new Monnify($this->config(), $this->client([
+            new Response(200, [], $this->json(['unused' => true])),
+        ]));
+
+        $this->assertSame([], $this->history);
+    }
+
+    #[Test]
+    public function initializeTransactionAuthenticatesLazilyAndSendsJsonPayload(): void
+    {
+        $monnify = new Monnify($this->config(), $this->client([
+            new Response(200, [], $this->json(['responseBody' => ['accessToken' => 'token-123']])),
+            new Response(200, [], $this->json(['requestSuccessful' => true])),
+        ]));
+
+        $response = $monnify->initializeTransaction([
+            'amount' => 5000,
+            'customerEmail' => 'customer@example.com',
+            'paymentReference' => 'payment-reference',
+            'currencyCode' => 'NGN',
         ]);
 
-        // Your test data for initializing a transaction
-        $transactionData = [
-            // Your transaction data here
-            'amount' => 100.00,
-            'currencyCode' => 'USD',
-            'customerName' => 'John Doe',
-            'customerEmail' => 'john.doe@example.com',
-        ];
+        $this->assertSame(['requestSuccessful' => true], $response);
+        $this->assertCount(2, $this->history);
 
-        // Call the method you want to test
-        $result = $monnify->initializeTransaction($transactionData);
+        $authRequest = $this->history[0]['request'];
+        $this->assertSame('POST', $authRequest->getMethod());
+        $this->assertSame('/api/v1/auth/login', $authRequest->getUri()->getPath());
+        $this->assertSame(
+            'Basic ' . base64_encode('api-key:secret-key'),
+            $authRequest->getHeaderLine('Authorization')
+        );
 
-        // Add assertions to check if the result is as expected
-        $this->assertTrue($result['success']);
-        $this->assertEquals('expected_value', $result['some_key']);
+        $transactionRequest = $this->history[1]['request'];
+        $this->assertSame('POST', $transactionRequest->getMethod());
+        $this->assertSame('/api/v1/merchant/transactions/init-transaction', $transactionRequest->getUri()->getPath());
+        $this->assertSame('Bearer token-123', $transactionRequest->getHeaderLine('Authorization'));
+        $this->assertSame(
+            [
+                'amount' => 5000,
+                'customerEmail' => 'customer@example.com',
+                'paymentReference' => 'payment-reference',
+                'currencyCode' => 'NGN',
+                'contractCode' => 'contract-code',
+            ],
+            json_decode((string) $transactionRequest->getBody(), true)
+        );
     }
 
-    public function testChargeCard()
+    #[Test]
+    public function callerSuppliedContractCodeIsPreserved(): void
     {
-        $monnify = new Monnify([
-            'api_key' => $this->apiKey, 
-            'secret_key' => $this->secretKey,  
-            'contract_code' => $this->contractCode,  
-            'test' => true
-        ]);    
-        // Your test data for charging a card
-        $transactionReference = 'your_transaction_reference';
-        $collectionChannel = 'your_collection_channel';
-        $cardData = [
-            // Your card data here
-        ];
-    
-        $result = $monnify->chargeCard($transactionReference, $collectionChannel, $cardData);
-    
-        $this->assertTrue($result['success']);
-        $this->assertEquals('expected_value', $result['some_key']);
-    }
-    
-    public function testGetTransactionStatus()
-    {
-        $monnify = new Monnify([
-            'api_key' => $this->apiKey, 
-            'secret_key' => $this->secretKey,  
-            'contract_code' => $this->contractCode,  
-            'test' => true
+        $monnify = new Monnify($this->config(), $this->client([
+            new Response(200, [], $this->json(['responseBody' => ['accessToken' => 'token-123']])),
+            new Response(200, [], $this->json(['requestSuccessful' => true])),
+        ]));
+
+        $monnify->initializeTransaction([
+            'amount' => 5000,
+            'customerEmail' => 'customer@example.com',
+            'paymentReference' => 'payment-reference',
+            'currencyCode' => 'NGN',
+            'contractCode' => 'override-contract-code',
         ]);
 
-        $transactionReference = 'your_transaction_reference';
-    
-        $result = $monnify->getTransactionStatus($transactionReference);
-    
-        $this->assertTrue($result['success']);
-        $this->assertEquals('expected_value', $result['some_key']);
+        $request = $this->history[1]['request'];
+
+        $this->assertSame(
+            [
+                'amount' => 5000,
+                'customerEmail' => 'customer@example.com',
+                'paymentReference' => 'payment-reference',
+                'currencyCode' => 'NGN',
+                'contractCode' => 'override-contract-code',
+            ],
+            json_decode((string) $request->getBody(), true)
+        );
     }
-    
-    public function testGetAllTransactions()
+
+    #[Test]
+    public function bearerTokenIsReusedAcrossRequests(): void
     {
-        $monnify = new Monnify([
-            'api_key' => $this->apiKey, 
-            'secret_key' => $this->secretKey,  
-            'contract_code' => $this->contractCode,  
-            'test' => true
-        ]);    
-        // Your test data for getting all transactions
-        $page = 0;
-        $size = 10;
-        $filters = [
-            // Your filter data here
-        ];
-    
-        $result = $monnify->getAllTransactions($page, $size, $filters);
-    
-        $this->assertTrue($result['success']);
-        $this->assertEquals('expected_value', $result['some_key']);
+        $monnify = new Monnify($this->config(), $this->client([
+            new Response(200, [], $this->json(['responseBody' => ['accessToken' => 'token-123']])),
+            new Response(200, [], $this->json(['banks' => []])),
+            new Response(200, [], $this->json(['banks' => []])),
+        ]));
+
+        $monnify->getAllBanks();
+        $monnify->getAllBanks();
+
+        $this->assertCount(3, $this->history);
+        $this->assertSame('/api/v1/auth/login', $this->history[0]['request']->getUri()->getPath());
+        $this->assertSame('/api/v1/banks', $this->history[1]['request']->getUri()->getPath());
+        $this->assertSame('/api/v1/banks', $this->history[2]['request']->getUri()->getPath());
     }
-    
-    public function testGetAllBanks()
+
+    #[Test]
+    public function getAllTransactionsSendsQueryParameters(): void
     {
-        $monnify = new Monnify([
-            'api_key' => $this->apiKey, 
-            'secret_key' => $this->secretKey,  
-            'contract_code' => $this->contractCode,  
-            'test' => true
+        $monnify = new Monnify($this->config(), $this->client([
+            new Response(200, [], $this->json(['responseBody' => ['accessToken' => 'token-123']])),
+            new Response(200, [], $this->json(['requestSuccessful' => true])),
+        ]));
+
+        $monnify->getAllTransactions(2, 50, ['paymentStatus' => 'PAID']);
+
+        $request = $this->history[1]['request'];
+
+        $this->assertSame('/api/v1/transactions/search', $request->getUri()->getPath());
+        $this->assertSame('page=2&size=50&paymentStatus=PAID', $request->getUri()->getQuery());
+    }
+
+    #[Test]
+    public function webhookValidationUsesConfiguredSecret(): void
+    {
+        $monnify = new Monnify($this->config(), $this->client([]));
+        $body = '{"eventType":"SUCCESSFUL_TRANSACTION"}';
+
+        $validHash = hash_hmac('sha512', $body, 'secret-key');
+
+        $this->assertTrue($monnify->validateWebhook($body, $validHash));
+        $this->assertFalse($monnify->validateWebhook($body, 'invalid-hash'));
+    }
+
+    #[Test]
+    public function configCanBeCreatedFromLaravelFriendlyArray(): void
+    {
+        $config = MonnifyConfig::fromArray([
+            'api_key' => 'api-key',
+            'secret_key' => 'secret-key',
+            'contract_code' => 'contract-code',
+            'environment' => 'live',
         ]);
 
-        $result = $monnify->getAllBanks();
-    
-        $this->assertTrue($result['success']);
-        $this->assertEquals('expected_value', $result['some_key']);
-    }
-    
-    public function testCreateReservedAccount()
-    {
-        $monnify = new Monnify([
-            'api_key' => $this->apiKey, 
-            'secret_key' => $this->secretKey,  
-            'contract_code' => $this->contractCode,  
-            'test' => true
-        ]);    
-
-        // Your test data for creating a reserved account
-        $accountData = [
-            // Your account data here
-        ];
-    
-        $result = $monnify->createReservedAccount($accountData);
-    
-        $this->assertTrue($result['success']);
-        $this->assertEquals('expected_value', $result['some_key']);
-    }
-    
-    public function testGetReservedAccountDetails()
-    {
-        $monnify = new Monnify(['api_key' => 'your_api_key', 'secret_key' => 'your_secret_key', 'test' => true]);
-
-        // Replace 'abc1niui--23' with the actual account reference
-        $accountReference = 'abc1niui--23';
-
-        $result = $monnify->getReservedAccountDetails($accountReference);
-
-        $this->assertTrue($result['success']);
-        $this->assertEquals('success', $result['responseMessage']);
-
-        // Add more assertions to validate the response data
-        $this->assertEquals('expected_value', $result['responseBody']['contractCode']);
-        $this->assertEquals('expected_value', $result['responseBody']['accountName']);
-        // Add more assertions for other response data
+        $this->assertSame(Environment::Live, $config->environment);
+        $this->assertSame('https://api.monnify.com', $config->baseUrl());
     }
 
-
-    public function testInitiateSingleTransfer()
+    #[Test]
+    public function customBaseUrlCanBeConfigured(): void
     {
-        $monnify = new Monnify([
-            'api_key' => $this->apiKey, 
-            'secret_key' => $this->secretKey,  
-            'contract_code' => $this->contractCode,  
-            'test' => true
-        ]);    
+        $config = MonnifyConfig::sandbox(
+            apiKey: 'api-key',
+            secretKey: 'secret-key',
+            contractCode: 'contract-code',
+            apiUrl: 'https://example.test/',
+        );
 
-        // Your test data for initiating a single transfer
-        $transferData = [
-            // Your transfer data here
-        ];
-    
-        $result = $monnify->initiateSingleTransfer($transferData);
-    
-        $this->assertTrue($result['success']);
-        $this->assertEquals('expected_value', $result['some_key']);
+        $this->assertSame('https://example.test', $config->baseUrl());
     }
-    
-    public function testInitiateAsyncTransfer()
-    {
-        $monnify = new Monnify([
-            'api_key' => $this->apiKey, 
-            'secret_key' => $this->secretKey,  
-            'contract_code' => $this->contractCode,  
-            'test' => true
-        ]);    
 
-        // Your test data for initiating an asynchronous transfer
-        $transferData = [
-            // Your transfer data here
-        ];
-    
-        $result = $monnify->initiateAsyncTransfer($transferData);
-    
-        $this->assertTrue($result['success']);
-        $this->assertEquals('expected_value', $result['some_key']);
+    #[Test]
+    public function injectedTokenCacheAvoidsAuthenticationRequest(): void
+    {
+        $cache = new InMemoryTokenCache();
+        $cache->put('cached-token', 3600);
+
+        $monnify = new Monnify($this->config(), $this->client([
+            new Response(200, [], $this->json(['banks' => []])),
+        ]), $cache);
+
+        $monnify->getAllBanks();
+
+        $this->assertCount(1, $this->history);
+        $this->assertSame('/api/v1/banks', $this->history[0]['request']->getUri()->getPath());
+        $this->assertSame('Bearer cached-token', $this->history[0]['request']->getHeaderLine('Authorization'));
     }
-    
-    public function testValidateWebhook()
-    {
-        $monnify = new Monnify([
-            'api_key' => $this->apiKey, 
-            'secret_key' => $this->secretKey,  
-            'contract_code' => $this->contractCode,  
-            'test' => true
-        ]);    
 
-        // Your test data for validating a webhook
-        $requestBody = 'webhook_request_data';
-        $receivedHash = 'received_hash';
-    
-        $result = $monnify->validateWebhook($requestBody, $receivedHash);
-    
-        $this->assertTrue($result);
+    #[Test]
+    public function expiredTokenCacheFetchesNewToken(): void
+    {
+        $cache = new InMemoryTokenCache();
+        $cache->put('expired-token', -1);
+
+        $monnify = new Monnify($this->config(), $this->client([
+            new Response(200, [], $this->json(['responseBody' => ['accessToken' => 'fresh-token', 'expiresIn' => 120]])),
+            new Response(200, [], $this->json(['banks' => []])),
+        ]), $cache);
+
+        $monnify->getAllBanks();
+
+        $this->assertCount(2, $this->history);
+        $this->assertSame('/api/v1/auth/login', $this->history[0]['request']->getUri()->getPath());
+        $this->assertSame('fresh-token', $cache->get());
+    }
+
+    #[Test]
+    public function missingAccessTokenRaisesSdkException(): void
+    {
+        $monnify = new Monnify($this->config(), $this->client([
+            new Response(200, [], $this->json(['responseBody' => []])),
+        ]));
+
+        $this->expectException(MonnifyException::class);
+        $this->expectExceptionMessage('access token');
+
+        $monnify->getAllBanks();
+    }
+
+    #[Test]
+    public function networkFailureRaisesSdkException(): void
+    {
+        $monnify = new Monnify($this->config(), $this->client([
+            new Response(200, [], $this->json(['responseBody' => ['accessToken' => 'token-123']])),
+            new ConnectException('Connection timed out', new Request('GET', '/api/v1/banks')),
+        ]));
+
+        $this->expectException(MonnifyException::class);
+        $this->expectExceptionMessage('Monnify HTTP request failed');
+
+        $monnify->getAllBanks();
+    }
+
+    #[Test]
+    public function httpErrorRaisesSdkExceptionWithResponseMetadata(): void
+    {
+        $client = $this->client([
+            new Response(400, [], $this->json(['requestSuccessful' => false, 'responseMessage' => 'Bad request'])),
+        ]);
+
+        try {
+            $client->request('GET', '/api/v1/banks');
+            $this->fail('Expected MonnifyException to be thrown.');
+        } catch (MonnifyException $e) {
+            $this->assertSame(400, $e->statusCode());
+            $this->assertSame(
+                ['requestSuccessful' => false, 'responseMessage' => 'Bad request'],
+                $e->responseBody()
+            );
+            $this->assertSame(
+                $this->json(['requestSuccessful' => false, 'responseMessage' => 'Bad request']),
+                $e->rawResponseBody()
+            );
+        }
+    }
+
+    #[Test]
+    public function nonJsonHttpErrorPreservesStatusAndRawBody(): void
+    {
+        $client = $this->client([
+            new Response(502, [], 'Bad Gateway'),
+        ]);
+
+        try {
+            $client->request('GET', '/api/v1/banks');
+            $this->fail('Expected MonnifyException to be thrown.');
+        } catch (MonnifyException $e) {
+            $this->assertSame(502, $e->statusCode());
+            $this->assertNull($e->responseBody());
+            $this->assertSame('Bad Gateway', $e->rawResponseBody());
+        }
+    }
+
+    #[Test]
+    public function invalidJsonResponseRaisesSdkException(): void
+    {
+        $client = $this->client([
+            new Response(200, [], 'not-json'),
+        ]);
+
+        $this->expectException(MonnifyException::class);
+        $this->expectExceptionMessage('Invalid JSON response');
+
+        $client->request('GET', '/api/v1/banks');
+    }
+
+    #[Test]
+    public function emptyResponseBodyReturnsEmptyArray(): void
+    {
+        $client = $this->client([
+            new Response(204, [], ''),
+        ]);
+
+        $this->assertSame([], $client->request('GET', '/api/v1/banks'));
+    }
+
+    #[Test]
+    public function apiClientRetriesOnceAfterUnauthorizedResponse(): void
+    {
+        $cache = new InMemoryTokenCache();
+        $cache->put('stale-token', 3600);
+
+        $client = new MonnifyApiClient($this->config(), $this->client([
+            new Response(401, [], $this->json(['responseMessage' => 'Unauthorized'])),
+            new Response(200, [], $this->json(['responseBody' => ['accessToken' => 'fresh-token', 'expiresIn' => 120]])),
+            new Response(200, [], $this->json(['banks' => []])),
+        ]), $cache);
+
+        $response = $client->request('GET', '/api/v1/banks');
+
+        $this->assertSame(['banks' => []], $response);
+        $this->assertCount(3, $this->history);
+        $this->assertSame('Bearer stale-token', $this->history[0]['request']->getHeaderLine('Authorization'));
+        $this->assertSame('/api/v1/auth/login', $this->history[1]['request']->getUri()->getPath());
+        $this->assertSame('Bearer fresh-token', $this->history[2]['request']->getHeaderLine('Authorization'));
+    }
+
+    #[Test]
+    public function apiClientSendsAuthenticatedRequests(): void
+    {
+        $client = new MonnifyApiClient($this->config(), $this->client([
+            new Response(200, [], $this->json(['responseBody' => ['accessToken' => 'token-123']])),
+            new Response(200, [], $this->json(['ok' => true])),
+        ]));
+
+        $response = $client->request('PATCH', '/custom-endpoint', ['name' => 'Jane'], ['page' => 1]);
+
+        $this->assertSame(['ok' => true], $response);
+        $request = $this->history[1]['request'];
+        $this->assertSame('PATCH', $request->getMethod());
+        $this->assertSame('/custom-endpoint', $request->getUri()->getPath());
+        $this->assertSame('page=1', $request->getUri()->getQuery());
+        $this->assertSame(['name' => 'Jane'], json_decode((string) $request->getBody(), true));
+    }
+
+    /**
+     * @param array<int, mixed> $responses
+     */
+    private function client(array $responses): HttpClientInterface
+    {
+        $mock = new MockHandler($responses);
+        $stack = HandlerStack::create($mock);
+        $stack->push(Middleware::history($this->history));
+
+        $client = new Client([
+            'base_uri' => 'https://sandbox.monnify.com',
+            'handler' => $stack,
+        ]);
+
+        return new GuzzleHttpClient('https://sandbox.monnify.com', $client);
+    }
+
+    private function config(): MonnifyConfig
+    {
+        return MonnifyConfig::sandbox('api-key', 'secret-key', 'contract-code');
+    }
+
+    private function json(array $data): string
+    {
+        return json_encode($data, JSON_THROW_ON_ERROR);
     }
 }
