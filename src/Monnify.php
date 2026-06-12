@@ -7,6 +7,8 @@ use Monnify\Auth\TokenCacheInterface;
 use Monnify\Contracts\HttpClientInterface;
 use Monnify\Http\GuzzleHttpClient;
 use Monnify\Http\MonnifyApiClient;
+use Monnify\Services\OtherService;
+use Monnify\Services\TransactionService;
 
 /**
  * @phpstan-type Payload array<string, mixed>
@@ -15,6 +17,8 @@ use Monnify\Http\MonnifyApiClient;
 class Monnify
 {
     private MonnifyApiClient $client;
+    private ?TransactionService $transactions = null;
+    private ?OtherService $helper = null;
 
     public function __construct(
         private MonnifyConfig $config,
@@ -28,13 +32,23 @@ class Monnify
         );
     }
 
+    public function transactions(): TransactionService
+    {
+        return $this->transactions ??= new TransactionService($this->client);
+    }
+
+    public function helper(): OtherService
+    {
+        return $this->helper ??= new OtherService($this->client);
+    }
+
     /**
      * @param Payload $transactionData
      * @return ResponseData
      */
     public function initializeTransaction(array $transactionData): array
     {
-        return $this->client->request('POST', '/api/v1/merchant/transactions/init-transaction', $this->withContractCode($transactionData));
+        return $this->transactions()->initialise($this->withContractCode($transactionData));
     }
 
     /**
@@ -43,7 +57,7 @@ class Monnify
      */
     public function chargeCard(string $transactionReference, string $collectionChannel, array $cardData): array
     {
-        return $this->client->request('POST', '/api/v1/merchant/cards/charge', [
+        return $this->transactions()->chargeCard([
             'transactionReference' => $transactionReference,
             'collectionChannel' => $collectionChannel,
             'card' => $cardData,
@@ -55,7 +69,7 @@ class Monnify
      */
     public function getTransactionStatus(string $transactionReference): array
     {
-        return $this->client->request('GET', '/api/v2/transactions/' . rawurlencode($transactionReference));
+        return $this->transactions()->status($transactionReference);
     }
 
     /**
@@ -64,7 +78,7 @@ class Monnify
      */
     public function getAllTransactions(int $page = 0, int $size = 10, array $filters = []): array
     {
-        return $this->client->request('GET', '/api/v1/transactions/search', [], array_merge([
+        return $this->transactions()->all(array_merge([
             'page' => $page,
             'size' => $size,
         ], $filters));
@@ -75,7 +89,7 @@ class Monnify
      */
     public function getAllBanks(): array
     {
-        return $this->client->request('GET', '/api/v1/banks');
+        return $this->helper()->banks();
     }
 
     /**

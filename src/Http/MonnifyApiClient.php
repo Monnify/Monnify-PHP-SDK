@@ -5,11 +5,12 @@ namespace Monnify\Http;
 use Monnify\Auth\InMemoryTokenCache;
 use Monnify\Auth\TokenCacheInterface;
 use Monnify\Contracts\HttpClientInterface;
+use Monnify\Enums\HttpMethod;
 use Monnify\MonnifyConfig;
 use Monnify\MonnifyException;
 
 /**
- * @phpstan-type Payload array<string, mixed>
+ * @phpstan-type Payload array<array-key, mixed>
  * @phpstan-type ResponseData array<array-key, mixed>
  */
 final class MonnifyApiClient
@@ -24,12 +25,17 @@ final class MonnifyApiClient
         $this->tokenCache = $tokenCache ?? new InMemoryTokenCache();
     }
 
+    public function config(): MonnifyConfig
+    {
+        return $this->config;
+    }
+
     /**
      * @param Payload $data
      * @param Payload $query
      * @return ResponseData
      */
-    public function request(string $method, string $endpoint, array $data = [], array $query = []): array
+    public function request(HttpMethod $method, string $endpoint, array $data = [], array $query = []): array
     {
         try {
             return $this->sendAuthenticatedRequest($method, $endpoint, $data, $query);
@@ -49,7 +55,7 @@ final class MonnifyApiClient
      * @param Payload $query
      * @return ResponseData
      */
-    private function sendAuthenticatedRequest(string $method, string $endpoint, array $data = [], array $query = []): array
+    private function sendAuthenticatedRequest(HttpMethod $method, string $endpoint, array $data = [], array $query = []): array
     {
         $options = [
             'headers' => [
@@ -67,7 +73,7 @@ final class MonnifyApiClient
             $options['query'] = $query;
         }
 
-        return $this->client->request($method, $endpoint, $options);
+        return $this->client->request($method->value, $endpoint, $options);
     }
 
     private function getBearerToken(): string
@@ -78,7 +84,7 @@ final class MonnifyApiClient
             return $cachedToken;
         }
 
-        $data = $this->client->request('POST', '/api/v1/auth/login', [
+        $data = $this->client->request(HttpMethod::POST->value, '/api/v1/auth/login', [
             'headers' => [
                 'Authorization' => 'Basic ' . base64_encode($this->config->apiKey . ':' . $this->config->secretKey),
                 'Accept' => 'application/json',
