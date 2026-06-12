@@ -8,6 +8,7 @@ use Monnify\Contracts\HttpClientInterface;
 use Monnify\Http\GuzzleHttpClient;
 use Monnify\Http\MonnifyApiClient;
 use Monnify\Services\CustomerReservedAccountService;
+use Monnify\Services\DisbursementService;
 use Monnify\Services\OtherService;
 use Monnify\Services\TransactionService;
 
@@ -20,6 +21,7 @@ class Monnify
     private MonnifyApiClient $client;
     private ?TransactionService $transactions = null;
     private ?CustomerReservedAccountService $customerReservedAccounts = null;
+    private ?DisbursementService $disbursements = null;
     private ?OtherService $helper = null;
 
     public function __construct(
@@ -47,6 +49,11 @@ class Monnify
     public function customerReservedAccounts(): CustomerReservedAccountService
     {
         return $this->customerReservedAccounts ??= new CustomerReservedAccountService($this->client);
+    }
+
+    public function disbursements(): DisbursementService
+    {
+        return $this->disbursements ??= new DisbursementService($this->client);
     }
 
     /**
@@ -144,9 +151,7 @@ class Monnify
      */
     public function getSingleTransferStatus(string $reference): array
     {
-        return $this->client->request('GET', '/api/v2/disbursements/single/summary', [], [
-            'reference' => $reference,
-        ]);
+        return $this->disbursements()->singleStatus($reference);
     }
 
     /**
@@ -154,10 +159,7 @@ class Monnify
      */
     public function listAllSingleTransfers(int $pageSize, int $pageNo): array
     {
-        return $this->client->request('GET', '/api/v2/disbursements/single/transactions', [], [
-            'pageSize' => $pageSize,
-            'pageNo' => $pageNo,
-        ]);
+        return $this->disbursements()->all('single', $pageSize, $pageNo);
     }
 
     /**
@@ -166,7 +168,7 @@ class Monnify
      */
     public function initiateSingleTransfer(array $transferData): array
     {
-        return $this->client->request('POST', '/api/v2/disbursements/single', $transferData);
+        return $this->disbursements()->single($transferData);
     }
 
     /**
@@ -175,7 +177,7 @@ class Monnify
      */
     public function initiateAsyncTransfer(array $transferData): array
     {
-        return $this->client->request('POST', '/api/v2/disbursements/single', $transferData);
+        return $this->disbursements()->single($transferData, true);
     }
 
     public function validateWebhook(string $requestBody, string $receivedHash): bool
