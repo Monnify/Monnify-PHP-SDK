@@ -7,6 +7,7 @@ use Monnify\Auth\TokenCacheInterface;
 use Monnify\Contracts\HttpClientInterface;
 use Monnify\Http\GuzzleHttpClient;
 use Monnify\Http\MonnifyApiClient;
+use Monnify\Services\CustomerReservedAccountService;
 use Monnify\Services\OtherService;
 use Monnify\Services\TransactionService;
 
@@ -18,6 +19,7 @@ class Monnify
 {
     private MonnifyApiClient $client;
     private ?TransactionService $transactions = null;
+    private ?CustomerReservedAccountService $customerReservedAccounts = null;
     private ?OtherService $helper = null;
 
     public function __construct(
@@ -40,6 +42,11 @@ class Monnify
     public function helper(): OtherService
     {
         return $this->helper ??= new OtherService($this->client);
+    }
+
+    public function customerReservedAccounts(): CustomerReservedAccountService
+    {
+        return $this->customerReservedAccounts ??= new CustomerReservedAccountService($this->client);
     }
 
     /**
@@ -98,7 +105,7 @@ class Monnify
      */
     public function createReservedAccount(array $accountData): array
     {
-        return $this->client->request('POST', '/api/v2/bank-transfer/reserved-accounts', $this->withContractCode($accountData));
+        return $this->customerReservedAccounts()->createGeneralAccount($this->withContractCode($accountData));
     }
 
     /**
@@ -106,7 +113,7 @@ class Monnify
      */
     public function getReservedAccountDetails(string $accountReference): array
     {
-        return $this->client->request('GET', '/api/v2/bank-transfer/reserved-accounts/' . rawurlencode($accountReference));
+        return $this->customerReservedAccounts()->get($accountReference);
     }
 
     /**
@@ -115,7 +122,7 @@ class Monnify
      */
     public function addLinkedAccounts(string $accountReference, bool $getAllAvailableBanks, array $preferredBanks = []): array
     {
-        return $this->client->request('PUT', '/api/v1/bank-transfer/reserved-accounts/add-linked-accounts/' . rawurlencode($accountReference), [
+        return $this->customerReservedAccounts()->addLinkedAccounts($accountReference, [
             'getAllAvailableBanks' => $getAllAvailableBanks,
             'preferredBanks' => $preferredBanks,
         ]);
@@ -126,8 +133,7 @@ class Monnify
      */
     public function getReservedAccountTransactions(string $accountReference, int $page = 0, int $size = 10): array
     {
-        return $this->client->request('GET', '/api/v1/bank-transfer/reserved-accounts/transactions', [], [
-            'accountReference' => $accountReference,
+        return $this->customerReservedAccounts()->transactions($accountReference, [
             'page' => $page,
             'size' => $size,
         ]);
