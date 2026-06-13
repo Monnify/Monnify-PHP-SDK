@@ -7,10 +7,21 @@ use Monnify\Auth\TokenCacheInterface;
 use Monnify\Contracts\HttpClientInterface;
 use Monnify\Http\GuzzleHttpClient;
 use Monnify\Http\MonnifyApiClient;
+use Monnify\Services\BillsPaymentService;
 use Monnify\Services\CustomerReservedAccountService;
+use Monnify\Services\DirectDebitService;
 use Monnify\Services\DisbursementService;
+use Monnify\Services\InvoiceService;
+use Monnify\Services\LimitProfileService;
 use Monnify\Services\OtherService;
+use Monnify\Services\PayCodeService;
+use Monnify\Services\RecurringPaymentService;
+use Monnify\Services\RefundService;
+use Monnify\Services\SettlementService;
+use Monnify\Services\SubAccountService;
 use Monnify\Services\TransactionService;
+use Monnify\Services\VerificationService;
+use Monnify\Services\WalletService;
 
 /**
  * @phpstan-type Payload array<string, mixed>
@@ -20,9 +31,20 @@ class Monnify
 {
     private MonnifyApiClient $client;
     private ?TransactionService $transactions = null;
+    private ?BillsPaymentService $billsPayments = null;
     private ?CustomerReservedAccountService $customerReservedAccounts = null;
+    private ?DirectDebitService $directDebits = null;
     private ?DisbursementService $disbursements = null;
+    private ?InvoiceService $invoices = null;
+    private ?LimitProfileService $limitProfiles = null;
     private ?OtherService $helper = null;
+    private ?PayCodeService $payCodes = null;
+    private ?RecurringPaymentService $recurringPayments = null;
+    private ?RefundService $refunds = null;
+    private ?SettlementService $settlements = null;
+    private ?SubAccountService $subAccounts = null;
+    private ?VerificationService $verifications = null;
+    private ?WalletService $wallets = null;
 
     public function __construct(
         private MonnifyConfig $config,
@@ -46,14 +68,69 @@ class Monnify
         return $this->helper ??= new OtherService($this->client);
     }
 
+    public function billsPayments(): BillsPaymentService
+    {
+        return $this->billsPayments ??= new BillsPaymentService($this->client);
+    }
+
     public function customerReservedAccounts(): CustomerReservedAccountService
     {
         return $this->customerReservedAccounts ??= new CustomerReservedAccountService($this->client);
     }
 
+    public function directDebits(): DirectDebitService
+    {
+        return $this->directDebits ??= new DirectDebitService($this->client);
+    }
+
     public function disbursements(): DisbursementService
     {
         return $this->disbursements ??= new DisbursementService($this->client);
+    }
+
+    public function invoices(): InvoiceService
+    {
+        return $this->invoices ??= new InvoiceService($this->client);
+    }
+
+    public function limitProfiles(): LimitProfileService
+    {
+        return $this->limitProfiles ??= new LimitProfileService($this->client);
+    }
+
+    public function payCodes(): PayCodeService
+    {
+        return $this->payCodes ??= new PayCodeService($this->client);
+    }
+
+    public function recurringPayments(): RecurringPaymentService
+    {
+        return $this->recurringPayments ??= new RecurringPaymentService($this->client);
+    }
+
+    public function refunds(): RefundService
+    {
+        return $this->refunds ??= new RefundService($this->client);
+    }
+
+    public function settlements(): SettlementService
+    {
+        return $this->settlements ??= new SettlementService($this->client);
+    }
+
+    public function subAccounts(): SubAccountService
+    {
+        return $this->subAccounts ??= new SubAccountService($this->client);
+    }
+
+    public function verifications(): VerificationService
+    {
+        return $this->verifications ??= new VerificationService($this->client);
+    }
+
+    public function wallets(): WalletService
+    {
+        return $this->wallets ??= new WalletService($this->client);
     }
 
     /**

@@ -316,7 +316,7 @@ class MonnifyTest extends TestCase
             new Response(200, [], $this->json(['banks' => []])),
         ]), $cache);
 
-        $response = $client->request('GET', '/api/v1/banks');
+        $response = $client->request(\Monnify\Enums\HttpMethod::GET, '/api/v1/banks');
 
         $this->assertSame(['banks' => []], $response);
         $this->assertCount(3, $this->history);
@@ -333,7 +333,7 @@ class MonnifyTest extends TestCase
             new Response(200, [], $this->json(['ok' => true])),
         ]));
 
-        $response = $client->request('PATCH', '/custom-endpoint', ['name' => 'Jane'], ['page' => 1]);
+        $response = $client->request(\Monnify\Enums\HttpMethod::PATCH, '/custom-endpoint', ['name' => 'Jane'], ['page' => 1]);
 
         $this->assertSame(['ok' => true], $response);
         $request = $this->history[1]['request'];
