@@ -1,23 +1,20 @@
 <?php
 
-require_once('/src/monnify.php');
-use Monnify\Monnify;  
+require_once __DIR__ . '/../vendor/autoload.php';
 
+use Monnify\Monnify;
+use Monnify\MonnifyConfig;
 
-$config = [
-    'api_key' => "MF_990000",
-    'secret_key' => "EN94009AL930303030",
-    'contract_code' => "5120301202",
-    'test' => false, // this is to 
-];
-
-$monnify = new Monnify($config);
+$monnify = new Monnify(MonnifyConfig::sandbox(
+    apiKey: 'YOUR_API_KEY',
+    secretKey: 'YOUR_SECRET_KEY',
+    contractCode: 'YOUR_CONTRACT_CODE',
+));
 
 $accountData = [
     'accountReference' => 'unique_reference',
     'accountName' => 'Account Name',
     'currencyCode' => 'NGN',
-    'contractCode' => 'your_contract_code',
     'customerEmail' => 'customer@example.com',
     // Add other required parameters as needed
 ];
