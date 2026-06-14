@@ -22,6 +22,7 @@ use Monnify\Services\SubAccountService;
 use Monnify\Services\TransactionService;
 use Monnify\Services\VerificationService;
 use Monnify\Services\WalletService;
+use Monnify\Webhooks\WebhookSignatureVerifier;
 
 /**
  * @phpstan-type Payload array<string, mixed>
@@ -45,6 +46,7 @@ class Monnify
     private ?SubAccountService $subAccounts = null;
     private ?VerificationService $verifications = null;
     private ?WalletService $wallets = null;
+    private ?WebhookSignatureVerifier $webhooks = null;
 
     public function __construct(
         private MonnifyConfig $config,
@@ -58,6 +60,12 @@ class Monnify
         );
     }
 
+    /*
+     * Preferred public API.
+     *
+     * New SDK usage should go through these grouped services so the core and
+     * Laravel packages share one service shape.
+     */
     public function transactions(): TransactionService
     {
         return $this->transactions ??= new TransactionService($this->client);
@@ -133,7 +141,16 @@ class Monnify
         return $this->wallets ??= new WalletService($this->client);
     }
 
+    public function webhooks(): WebhookSignatureVerifier
+    {
+        return $this->webhooks ??= new WebhookSignatureVerifier($this->config->secretKey);
+    }
+
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->transactions()->initialise($transactionData)
+     *
      * @param Payload $transactionData
      * @return ResponseData
      */
@@ -143,6 +160,10 @@ class Monnify
     }
 
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->transactions()->chargeCard($payload)
+     *
      * @param Payload $cardData
      * @return ResponseData
      */
@@ -156,6 +177,10 @@ class Monnify
     }
 
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->transactions()->status($transactionReference)
+     *
      * @return ResponseData
      */
     public function getTransactionStatus(string $transactionReference): array
@@ -164,6 +189,10 @@ class Monnify
     }
 
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->transactions()->all($parameters)
+     *
      * @param Payload $filters
      * @return ResponseData
      */
@@ -176,6 +205,10 @@ class Monnify
     }
 
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->helper()->banks()
+     *
      * @return ResponseData
      */
     public function getAllBanks(): array
@@ -184,6 +217,10 @@ class Monnify
     }
 
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->customerReservedAccounts()->createGeneralAccount($accountData)
+     *
      * @param Payload $accountData
      * @return ResponseData
      */
@@ -193,6 +230,10 @@ class Monnify
     }
 
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->customerReservedAccounts()->get($accountReference)
+     *
      * @return ResponseData
      */
     public function getReservedAccountDetails(string $accountReference): array
@@ -201,6 +242,10 @@ class Monnify
     }
 
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->customerReservedAccounts()->addLinkedAccounts($accountReference, $payload)
+     *
      * @param list<string> $preferredBanks
      * @return ResponseData
      */
@@ -213,6 +258,10 @@ class Monnify
     }
 
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->customerReservedAccounts()->transactions($accountReference, $parameters)
+     *
      * @return ResponseData
      */
     public function getReservedAccountTransactions(string $accountReference, int $page = 0, int $size = 10): array
@@ -224,6 +273,10 @@ class Monnify
     }
 
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->disbursements()->singleStatus($reference)
+     *
      * @return ResponseData
      */
     public function getSingleTransferStatus(string $reference): array
@@ -232,6 +285,10 @@ class Monnify
     }
 
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->disbursements()->all('single', $pageSize, $pageNo)
+     *
      * @return ResponseData
      */
     public function listAllSingleTransfers(int $pageSize, int $pageNo): array
@@ -240,6 +297,10 @@ class Monnify
     }
 
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->disbursements()->single($transferData)
+     *
      * @param Payload $transferData
      * @return ResponseData
      */
@@ -249,6 +310,10 @@ class Monnify
     }
 
     /**
+     * Backward-compatible convenience wrapper for older core SDK usage.
+     *
+     * Prefer: $monnify->disbursements()->single($transferData, true)
+     *
      * @param Payload $transferData
      * @return ResponseData
      */
@@ -257,9 +322,15 @@ class Monnify
         return $this->disbursements()->single($transferData, true);
     }
 
+    /**
+     * Backward-compatible boolean webhook helper for older core SDK usage.
+     *
+     * Prefer: $monnify->webhooks()->verify($requestBody, $receivedHash)
+     * or: $monnify->webhooks()->isValid($requestBody, $receivedHash)
+     */
     public function validateWebhook(string $requestBody, string $receivedHash): bool
     {
-        return hash_equals(hash_hmac('sha512', $requestBody, $this->config->secretKey), $receivedHash);
+        return $this->webhooks()->isValid($requestBody, $receivedHash);
     }
 
     /**

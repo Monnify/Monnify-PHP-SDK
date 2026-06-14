@@ -92,13 +92,35 @@ Transport, authentication, and invalid JSON failures throw `Monnify\MonnifyExcep
 
 ## Webhooks
 
-Verify webhook payloads with your configured secret key:
+Verify webhook payloads with your configured secret key. The SDK expects the exact raw request body and the value of the `monnify-signature` header:
 
 ```php
-$isValid = $monnify->validateWebhook(
-    requestBody: $rawBody,
-    receivedHash: $signature,
-);
+use Monnify\Exceptions\InvalidWebhookSignatureException;
+
+try {
+    $monnify->webhooks()->verify($rawBody, $signature);
+} catch (InvalidWebhookSignatureException $e) {
+    // Reject the webhook.
+}
+```
+
+You can also use the boolean helper:
+
+```php
+$isValid = $monnify->webhooks()->isValid($rawBody, $signature);
+```
+
+Webhook payloads can be wrapped for easier event handling while still preserving unknown event types:
+
+```php
+use Monnify\Enums\WebhookEventType;
+use Monnify\Webhooks\WebhookPayload;
+
+$payload = WebhookPayload::fromArray(json_decode($rawBody, true));
+
+if ($payload->is(WebhookEventType::SuccessfulTransaction)) {
+    $paymentReference = $payload->eventData['paymentReference'] ?? null;
+}
 ```
 
 ## Documentation
