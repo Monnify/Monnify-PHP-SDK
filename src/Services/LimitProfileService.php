@@ -56,6 +56,7 @@ final class LimitProfileService
      */
     public function reserveAccount(array $data): array
     {
+        $data += ['contractCode' => $this->client->config()->contractCode];
         $this->validator->requireStrings($data, ['accountReference', 'limitProfileCode', 'accountName', 'contractCode']);
         $this->validator->optionalStrings($data, ['currencyCode', 'customerEmail']);
 

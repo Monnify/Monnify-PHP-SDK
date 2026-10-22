@@ -63,6 +63,6 @@ final class SubAccountService
     {
         $this->validator->requireStrings($data, ['currencyCode', 'accountNumber', 'bankCode', 'email']);
         $this->validator->optionalString($data, 'subAccountCode');
-        $this->validator->requireMinimum($data, 'defaultSplitPercentage', 20);
+        $this->validator->requireMinimum($data, 'defaultSplitPercentage', 0.01);
     }
 }

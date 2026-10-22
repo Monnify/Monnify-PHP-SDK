@@ -49,17 +49,32 @@ final class SubAccountServiceTest extends TestCase
         $service->update($payload);
     }
 
+    #[Test]
+    public function create_accepts_split_percentage_below_twenty(): void
+    {
+        $service = new SubAccountService($this->apiClient([
+            $this->authResponse(),
+            $this->okResponse(),
+        ]));
+        $payload = [$this->validPayload(['defaultSplitPercentage' => 5])];
+
+        $service->create($payload);
+
+        $this->assertSame($payload, $this->requestJson(1));
+    }
+
     /**
+     * @param array<string, mixed> $overrides
      * @return array<string, mixed>
      */
-    private function validPayload(): array
+    private function validPayload(array $overrides = []): array
     {
-        return [
+        return array_merge([
             'currencyCode' => 'NGN',
             'accountNumber' => '0123456789',
             'bankCode' => '058',
             'email' => 'jane@example.com',
             'defaultSplitPercentage' => 20,
-        ];
+        ], $overrides);
     }
 }

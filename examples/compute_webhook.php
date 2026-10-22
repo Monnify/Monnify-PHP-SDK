@@ -15,7 +15,7 @@ $monnify = new Monnify(MonnifyConfig::sandbox(
 $requestBody = file_get_contents('php://input') ?: ''; // Get the request body
 
 // Extract the received hash from the request headers
-$receivedHash = $_SERVER['HTTP_X_MONNIFY_SIGNATURE'] ?? '';
+$receivedHash = $_SERVER['HTTP_MONNIFY_SIGNATURE'] ?? '';
 
 // Validate the webhook
 if ($monnify->validateWebhook($requestBody, $receivedHash)) {

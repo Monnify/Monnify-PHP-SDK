@@ -58,6 +58,23 @@ final class LimitProfileServiceTest extends TestCase
         $service->update('', $this->validPayload());
     }
 
+    #[Test]
+    public function reserve_account_uses_configured_contract_code_when_omitted(): void
+    {
+        $service = new LimitProfileService($this->apiClient([
+            $this->authResponse(),
+            $this->okResponse(),
+        ]));
+
+        $service->reserveAccount([
+            'accountReference' => 'acct-ref',
+            'limitProfileCode' => 'limit-123',
+            'accountName' => 'Reserved account',
+        ]);
+
+        $this->assertSame('contract-code', $this->requestJson(1)['contractCode']);
+    }
+
     /**
      * @return array<string, mixed>
      */

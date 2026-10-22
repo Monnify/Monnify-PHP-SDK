@@ -197,6 +197,40 @@ final class TransactionServiceTest extends TestCase
         $service->initialise([]);
     }
 
+    #[Test]
+    public function initialiseValidatesListOfIncomeSplitConfigs(): void
+    {
+        $payload = $this->validInitializePayload() + [
+            'incomeSplitConfig' => [
+                ['subAccountCode' => 'MFY_SUB_1', 'feePercentage' => 10, 'splitPercentage' => 20, 'feeBearer' => true],
+            ],
+        ];
+        $service = $this->service([
+            new Response(200, [], $this->json(['responseBody' => ['accessToken' => 'token-123']])),
+            new Response(200, [], $this->json(['ok' => true])),
+        ]);
+
+        $service->initialise($payload);
+
+        $this->assertSame($payload, json_decode((string) $this->history[1]['request']->getBody(), true));
+    }
+
+    #[Test]
+    public function authorizeThreeDsCardUsesConfiguredApiKeyWhenOmitted(): void
+    {
+        $payload = $this->validThreeDsPayload();
+        unset($payload['apiKey']);
+        $service = $this->service([
+            new Response(200, [], $this->json(['responseBody' => ['accessToken' => 'token-123']])),
+            new Response(200, [], $this->json(['ok' => true])),
+        ]);
+
+        $service->authorizeThreeDSCard($payload);
+
+        $sent = json_decode((string) $this->history[1]['request']->getBody(), true);
+        $this->assertSame('api-key', $sent['apiKey']);
+    }
+
     /**
      * @param array<int, mixed> $responses
      */

@@ -56,6 +56,21 @@ final class DirectDebitServiceTest extends TestCase
         $service->get('');
     }
 
+    #[Test]
+    public function create_uses_configured_contract_code_when_omitted(): void
+    {
+        $payload = $this->validMandatePayload();
+        unset($payload['contractCode']);
+        $service = new DirectDebitService($this->apiClient([
+            $this->authResponse(),
+            $this->okResponse(),
+        ]));
+
+        $service->create($payload);
+
+        $this->assertSame('contract-code', $this->requestJson(1)['contractCode']);
+    }
+
     /**
      * @return array<string, mixed>
      */

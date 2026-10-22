@@ -27,12 +27,21 @@ final class TransactionValidator extends Validator
         $this->optionalArray($data, 'incomeSplitConfig');
 
         if (isset($data['incomeSplitConfig']) && is_array($data['incomeSplitConfig'])) {
-            $splitConfig = $data['incomeSplitConfig'];
-            $this->optionalString($splitConfig, 'subAccountCode');
-            $this->optionalBoolean($splitConfig, 'feeBearer');
-            $this->optionalNumeric($splitConfig, 'feePercentage');
-            $this->optionalNumeric($splitConfig, 'splitPercentage');
-            $this->optionalNumeric($splitConfig, 'splitAmount');
+            $splits = array_is_list($data['incomeSplitConfig'])
+                ? $data['incomeSplitConfig']
+                : [$data['incomeSplitConfig']];
+
+            foreach ($splits as $splitConfig) {
+                if (! is_array($splitConfig)) {
+                    throw new InvalidArgumentException('incomeSplitConfig must be an array of split configurations');
+                }
+
+                $this->optionalString($splitConfig, 'subAccountCode');
+                $this->optionalBoolean($splitConfig, 'feeBearer');
+                $this->optionalNumeric($splitConfig, 'feePercentage');
+                $this->optionalNumeric($splitConfig, 'splitPercentage');
+                $this->optionalNumeric($splitConfig, 'splitAmount');
+            }
         }
     }
 

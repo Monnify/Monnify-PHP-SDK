@@ -42,6 +42,21 @@ final class InvoiceServiceTest extends TestCase
         $this->assertSame($payload, $this->requestJson(5));
     }
 
+    #[Test]
+    public function create_uses_configured_contract_code_when_omitted(): void
+    {
+        $payload = $this->validPayload();
+        unset($payload['contractCode']);
+        $service = new InvoiceService($this->apiClient([
+            $this->authResponse(),
+            $this->okResponse(),
+        ]));
+
+        $service->create($payload);
+
+        $this->assertSame('contract-code', $this->requestJson(1)['contractCode']);
+    }
+
     /**
      * @return array<string, mixed>
      */

@@ -24,6 +24,7 @@ final class DirectDebitService
      */
     public function create(array $data): array
     {
+        $data += ['contractCode' => $this->client->config()->contractCode];
         $this->validator->requireStrings($data, [
             'contractCode',
             'mandateReference',

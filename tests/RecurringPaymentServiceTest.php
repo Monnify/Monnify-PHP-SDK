@@ -40,6 +40,23 @@ final class RecurringPaymentServiceTest extends TestCase
         $service->chargeCardToken($payload);
     }
 
+    #[Test]
+    public function it_uses_configured_contract_code_and_api_key_when_omitted(): void
+    {
+        $service = new RecurringPaymentService($this->apiClient([
+            $this->authResponse(),
+            $this->okResponse(),
+        ]));
+        $payload = $this->validPayload();
+        unset($payload['contractCode'], $payload['apiKey']);
+
+        $service->chargeCardToken($payload);
+
+        $sent = $this->requestJson(1);
+        $this->assertSame('contract-code', $sent['contractCode']);
+        $this->assertSame('api-key', $sent['apiKey']);
+    }
+
     /**
      * @return array<string, mixed>
      */

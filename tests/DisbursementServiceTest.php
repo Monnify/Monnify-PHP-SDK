@@ -202,6 +202,21 @@ final class DisbursementServiceTest extends TestCase
         $service->bulk($payload);
     }
 
+    #[Test]
+    public function singleAcceptsFiveAndSixDigitBankCodes(): void
+    {
+        $payload = $this->validSingleTransferPayload();
+        $payload['destinationBankCode'] = '50515';
+        $service = $this->service([
+            new Response(200, [], $this->json(['responseBody' => ['accessToken' => 'token-123']])),
+            new Response(200, [], $this->json(['ok' => true])),
+        ]);
+
+        $service->single($payload);
+
+        $this->assertSame($payload, json_decode((string) $this->history[1]['request']->getBody(), true));
+    }
+
     /**
      * @param array<int, mixed> $responses
      */

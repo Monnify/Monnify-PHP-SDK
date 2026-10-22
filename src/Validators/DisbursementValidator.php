@@ -21,7 +21,7 @@ final class DisbursementValidator extends Validator
         $this->requireString($data, 'reference');
         $this->requireString($data, 'narration');
         $this->requireString($data, 'destinationBankCode');
-        $this->requireMaxLength($data, 'destinationBankCode', 3);
+        $this->requireMaxLength($data, 'destinationBankCode', 6);
         $this->requireString($data, 'destinationAccountNumber');
         $this->requireString($data, 'destinationAccountName');
         $this->requireString($data, 'currency');
@@ -52,7 +52,7 @@ final class DisbursementValidator extends Validator
             $this->requireString($transaction, 'reference');
             $this->requireString($transaction, 'narration');
             $this->requireString($transaction, 'destinationBankCode');
-            $this->requireMaxLength($transaction, 'destinationBankCode', 3);
+            $this->requireMaxLength($transaction, 'destinationBankCode', 6);
             $this->requireString($transaction, 'destinationAccountNumber');
             $this->requireString($transaction, 'currency');
         }

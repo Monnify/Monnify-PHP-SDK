@@ -23,6 +23,10 @@ final class RecurringPaymentService
      */
     public function chargeCardToken(array $data): array
     {
+        $data += [
+            'contractCode' => $this->client->config()->contractCode,
+            'apiKey' => $this->client->config()->apiKey,
+        ];
         $this->validator->requireMinimum($data, 'amount', 20);
         $this->validator->requireStrings($data, ['cardToken', 'paymentReference', 'contractCode', 'apiKey']);
         $this->validator->requireEmailField($data, 'customerEmail');

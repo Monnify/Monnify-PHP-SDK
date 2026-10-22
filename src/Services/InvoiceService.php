@@ -24,6 +24,7 @@ final class InvoiceService
      */
     public function create(array $data): array
     {
+        $data += ['contractCode' => $this->client->config()->contractCode];
         $this->validateInvoice($data);
 
         return $this->client->request(\Monnify\Enums\HttpMethod::POST, '/api/v1/invoice/create', $data);

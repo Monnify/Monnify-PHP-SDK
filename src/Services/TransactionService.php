@@ -71,6 +71,7 @@ final class TransactionService
      */
     public function authorizeThreeDSCard(array $data): array
     {
+        $data += ['apiKey' => $this->client->config()->apiKey];
         $this->validator->validateAuthorizeThreeDSCard($data);
 
         return $this->client->request(HttpMethod::POST, '/api/v1/sdk/cards/secure-3d/authorize', $data);
