@@ -1,7 +1,10 @@
 /vendor
 /composer.lock
 .env
+temp_auto_push.bat
 .env.testing
 .phpunit.cache/
 .phpunit.result.cache
 coverage.xml
+.gitignore
+branch_structure.json

@@ -4,7 +4,7 @@ namespace Monnify\Http;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\ClientInterface as GuzzleClientInterface;
-use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Exception\TransferException;
 use JsonException;
 use Monnify\Contracts\HttpClientInterface;
@@ -27,16 +27,16 @@ final class GuzzleHttpClient implements HttpClientInterface
     {
         try {
             $response = $this->client->request($method, $uri, $options);
-        } catch (RequestException $e) {
+        } catch (BadResponseException $e) {
             $response = $e->getResponse();
-            $rawBody = $response !== null ? (string) $response->getBody() : null;
+            $rawBody = (string) $response->getBody();
 
             throw new MonnifyException(
                 message: 'Monnify HTTP request failed: ' . $e->getMessage(),
                 code: (int) $e->getCode(),
                 previous: $e,
-                statusCode: $response?->getStatusCode(),
-                responseBody: $rawBody !== null ? $this->tryDecodeBody($rawBody) : null,
+                statusCode: $response->getStatusCode(),
+                responseBody: $this->tryDecodeBody($rawBody),
                 rawResponseBody: $rawBody,
             );
         } catch (TransferException $e) {
