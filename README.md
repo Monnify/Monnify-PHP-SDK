@@ -4,7 +4,7 @@ Monnify PHP SDK is a framework-agnostic PHP wrapper for interacting with the Mon
 
 ## Requirements
 
-- PHP 8.1 or higher
+- PHP 8.1 or higher (supports PHP 8.1 through 8.5; we recommend running patched PHP releases `>= 8.2.35`, `>= 8.3.36`, `>= 8.4.27`, `>= 8.5.12`, or vendor-backported PHP 8.1 builds to mitigate `CVE-2026-109618` and `CVE-2026-109619`)
 
 ## Installation
 
